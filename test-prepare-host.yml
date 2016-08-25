@@ -48,16 +48,35 @@
         lxc_container_template_main_apt_repo: "{{ ubuntu_repo.stdout }}"
         lxc_container_template_security_apt_rep: "{{ ubuntu_repo.stdout }}"
   post_tasks:
-    - name: Create bridges
-      shell: /sbin/brctl addbr {{ item.name }} || true
+    - name: Ensure that /etc/network/interfaces.d/ exists
+      file:
+        path: /etc/network/interfaces.d/
+        state: directory
+
+    - name: Copy network configuration
+      template:
+        src: "{{ network_conf_filename }}"
+        dest: /etc/network/interfaces.d/test_interfaces.cfg
+      register: network_interfaces
+
+    - name: Ensure our interfaces.d configuration files are loaded automatically
+      lineinfile:
+        dest: /etc/network/interfaces
+        line: "source /etc/network/interfaces.d/*.cfg"
+
+    - name: Shut down the network interfaces
+      command: "ifdown {{ item }}"
+      when: network_interfaces | changed
       with_items: bridges
-      when: bridges is defined
-    - name: IP bridges
-      command: /sbin/ifconfig {{ item.name }} {{ item.ip_addr }} netmask 255.255.255.0
+
+    - name: Start the network interfaces
+      command: "ifup {{ item }}"
+      when: network_interfaces | changed
       with_items: bridges
-      when: bridges is defined
-    - name: Add iptables rule to ensure ssh checksum is correct
-      command: /sbin/iptables -A POSTROUTING -t mangle -p tcp --dport 22 -j CHECKSUM --checksum-fill
+
+    - name: Add iptables rules for lxc natting
+      command: /usr/local/bin/lxc-system-manage iptables-create
+
   roles:
     - role: "lxc_hosts"
   vars_files:
