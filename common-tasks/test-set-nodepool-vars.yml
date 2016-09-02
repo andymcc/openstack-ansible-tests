@@ -34,15 +34,28 @@
   when:
     - ansible_os_family == 'Debian'
 
-- name: Set the files to copy into the container cache for OpenStack-CI instances
+- name: install the epel repo rpm from a remote repo
+  yum:
+    name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+    state: "present"
+  when: ansible_pkg_mgr == 'yum'
+
+- name: Set the files to copy into the container cache for OpenStack-CI instances (deb)
+  set_fact:
+    lxc_container_cache_files:
+      - { src: '/etc/pip.conf', dest: '/etc/pip.conf' }
+      - { src: '/etc/apt/apt.conf.d/99unauthenticated', dest: '/etc/apt/apt.conf.d/99unauthenticated' }
+  when:
+    - nodepool.stat.exists | bool
+    - ansible_pkg_mgr == 'apt'
+
+- name: Set the files to copy into the container cache for OpenStack-CI instances (rhel)
   set_fact:
     lxc_container_cache_files:
       - { src: '/etc/pip.conf', dest: '/etc/pip.conf' }
   when:
     - nodepool.stat.exists | bool
+    - ansible_pkg_mgr == 'yum'
 
-- name: Set Ubuntu Cloud Archive repo URL based on discovered information
-  set_fact:
-    uca_apt_repo_url: "{{ ubuntu_repo_url.stdout | netorigin }}/ubuntu-cloud-archive"
-  when:
-    - ansible_pkg_mgr == 'apt'
+
+
